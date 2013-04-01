@@ -34,7 +34,7 @@ func sumResponseFilter(*Request, *http.Response) {
 
 func successFilter(req *Request) *http.Response {
 	doStageTrack()
-	return SimpleResponse(req.HttpRequest, 200, nil, "OK")
+	return StringResponse(req.HttpRequest, 200, nil, "OK")
 }
 
 func TestPipelineNoResponse(t *testing.T) {

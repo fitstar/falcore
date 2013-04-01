@@ -1,7 +1,8 @@
-package falcore
+package filter
 
 import (
 	"fmt"
+	"github.com/fitstar/falcore"
 	"io/ioutil"
 	"net/http"
 	"testing"
@@ -16,7 +17,7 @@ func TestHandlerFilter(t *testing.T) {
 	hff := NewHandlerFilter(http.HandlerFunc(handler))
 
 	tmp, _ := http.NewRequest("GET", "/hello", nil)
-	_, res := TestWithRequest(tmp, hff, nil)
+	_, res := falcore.TestWithRequest(tmp, hff, nil)
 
 	if res == nil {
 		t.Errorf("Response is nil")

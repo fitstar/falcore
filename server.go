@@ -29,7 +29,7 @@ type Server struct {
 	AcceptReady        chan int
 	sendfile           bool
 	sockOpt            int
-	bufferPool         *bufferPool
+	bufferPool         *BufferPool
 }
 
 type RequestCompletionCallback func(req *Request, res *http.Response)
@@ -58,7 +58,7 @@ func NewServer(port int, pipeline *Pipeline) *Server {
 	}
 
 	// buffer pool for reusing connection bufio.Readers
-	s.bufferPool = newBufferPool(100, 8192)
+	s.bufferPool = NewBufferPool(100, 8192)
 
 	return s
 }
@@ -195,8 +195,8 @@ func (srv *Server) sentinel(c net.Conn, connClosed chan int) {
 
 func (srv *Server) handler(c net.Conn) {
 	startTime := time.Now()
-	bpe := srv.bufferPool.take(c)
-	defer srv.bufferPool.give(bpe)
+	bpe := srv.bufferPool.Take(c)
+	defer srv.bufferPool.Give(bpe)
 	var closeSentinelChan = make(chan int)
 	go srv.sentinel(c, closeSentinelChan)
 	defer srv.connectionFinished(c, closeSentinelChan)
@@ -206,7 +206,7 @@ func (srv *Server) handler(c net.Conn) {
 	reqCount := 0
 	keepAlive := true
 	for err == nil && keepAlive {
-		if req, err = http.ReadRequest(bpe.br); err == nil {
+		if req, err = http.ReadRequest(bpe.Br); err == nil {
 			if req.Header.Get("Connection") != "Keep-Alive" {
 				keepAlive = false
 			}

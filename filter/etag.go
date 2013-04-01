@@ -1,4 +1,4 @@
-package etag
+package filter
 
 import (
 	"github.com/fitstar/falcore"
@@ -15,10 +15,10 @@ import (
 // Even as a last step, you will see a significant benefit if
 // clients are well behaved.
 // 
-type Filter struct {
+type EtagFilter struct {
 }
 
-func (f *Filter) FilterResponse(request *falcore.Request, res *http.Response) {
+func (f *EtagFilter) FilterResponse(request *falcore.Request, res *http.Response) {
 	request.CurrentStage.Status = 1 // Skipped (default)
 	if if_none_match := request.HttpRequest.Header.Get("If-None-Match"); if_none_match != "" {
 		if res.StatusCode == 200 && res.Header.Get("Etag") == if_none_match {

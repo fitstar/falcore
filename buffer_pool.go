@@ -7,55 +7,55 @@ import (
 )
 
 // uses a chan as a leaky bucket buffer pool
-type bufferPool struct {
+type BufferPool struct {
 	// size of buffer when creating new ones
 	bufSize int
 	// the actual pool of buffers ready for reuse
-	pool chan *bufferPoolEntry
+	pool chan *BufferPoolEntry
 }
 
 // This is what's stored in the buffer.  It allows
 // for the underlying io.Reader to be changed out
 // inside a bufio.Reader.  This is required for reuse.
-type bufferPoolEntry struct {
-	br     *bufio.Reader
+type BufferPoolEntry struct {
+	Br     *bufio.Reader
 	source io.Reader
 }
 
 // make bufferPoolEntry a passthrough io.Reader
-func (bpe *bufferPoolEntry) Read(p []byte) (n int, err error) {
+func (bpe *BufferPoolEntry) Read(p []byte) (n int, err error) {
 	return bpe.source.Read(p)
 }
 
-func newBufferPool(poolSize, bufferSize int) *bufferPool {
-	return &bufferPool{
+func NewBufferPool(poolSize, bufferSize int) *BufferPool {
+	return &BufferPool{
 		bufSize: bufferSize,
-		pool:    make(chan *bufferPoolEntry, poolSize),
+		pool:    make(chan *BufferPoolEntry, poolSize),
 	}
 }
 
 // Take a buffer from the pool and set
 // it up to read from r
-func (p *bufferPool) take(r io.Reader) (bpe *bufferPoolEntry) {
+func (p *BufferPool) Take(r io.Reader) (bpe *BufferPoolEntry) {
 	select {
 	case bpe = <-p.pool:
 		// prepare for reuse
-		if a := bpe.br.Buffered(); a > 0 {
+		if a := bpe.Br.Buffered(); a > 0 {
 			// drain the internal buffer
-			io.CopyN(ioutil.Discard, bpe.br, int64(a))
+			io.CopyN(ioutil.Discard, bpe.Br, int64(a))
 		}
 		// swap out the underlying reader
 		bpe.source = r
 	default:
 		// none available.  create a new one
-		bpe = &bufferPoolEntry{nil, r}
-		bpe.br = bufio.NewReaderSize(bpe, p.bufSize)
+		bpe = &BufferPoolEntry{nil, r}
+		bpe.Br = bufio.NewReaderSize(bpe, p.bufSize)
 	}
 	return
 }
 
 // Return a buffer to the pool
-func (p *bufferPool) give(bpe *bufferPoolEntry) {
+func (p *BufferPool) Give(bpe *BufferPoolEntry) {
 	select {
 	case p.pool <- bpe: // return to pool
 	default: // discard

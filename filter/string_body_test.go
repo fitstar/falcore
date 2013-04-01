@@ -1,12 +1,11 @@
-package falcore
+package filter
 
 import (
 	"bytes"
+	"github.com/fitstar/falcore"
 	"io/ioutil"
 	"net/http"
 	"testing"
-	"time"
-	//"io"
 )
 
 func TestStringBody(t *testing.T) {
@@ -14,12 +13,9 @@ func TestStringBody(t *testing.T) {
 	tmp, _ := http.NewRequest("POST", "/hello", bytes.NewReader(expected))
 	tmp.Header.Set("Content-Type", "text/plain")
 	tmp.ContentLength = int64(len(expected))
-	req := newRequest(tmp, nil, time.Now())
-	req.startPipelineStage("StringBodyTest")
 
 	sbf := NewStringBodyFilter()
-	//sbf := &StringBodyFilter{}
-	sbf.FilterRequest(req)
+	req, _ := falcore.TestWithRequest(tmp, sbf, nil)
 
 	if sb, ok := req.HttpRequest.Body.(*StringBody); ok {
 		readin, _ := ioutil.ReadAll(sb)
@@ -62,20 +58,16 @@ func BenchmarkStringBody(b *testing.B) {
 	b.StopTimer()
 	expected := []byte("test=123456&test2=987654&test3=somedatanstuff&test4=moredataontheend")
 	expLen := int64(len(expected))
-	req := newRequest(nil, nil, time.Now())
-	req.startPipelineStage("StringBodyTest")
 
 	sbf := NewStringBodyFilter()
-	//sbf := &StringBodyFilter{}
 
 	for i := 0; i < b.N; i++ {
 		tmp, _ := http.NewRequest("POST", "/hello", bytes.NewReader(expected))
 		tmp.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		tmp.ContentLength = expLen
-		req.HttpRequest = tmp
 		b.StartTimer()
 		// replace the body
-		sbf.FilterRequest(req)
+		req, _ := falcore.TestWithRequest(tmp, sbf, nil)
 		sbf.ReturnBuffer(req)
 		// read the body twice
 		/* nah, this isn't so useful

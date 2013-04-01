@@ -1,7 +1,8 @@
-package falcore
+package filter
 
 import (
 	"bytes"
+	"github.com/fitstar/falcore"
 	"io"
 	"net/http"
 	"strings"
@@ -12,26 +13,26 @@ import (
 
 type StringBody struct {
 	BodyBuffer *bytes.Reader
-	bpe        *bufferPoolEntry
+	bpe        *falcore.BufferPoolEntry
 }
 
 type StringBodyFilter struct {
-	pool *bufferPool
+	pool *falcore.BufferPool
 }
 
 func NewStringBodyFilter() *StringBodyFilter {
 	sbf := &StringBodyFilter{}
-	sbf.pool = newBufferPool(100, 1024)
+	sbf.pool = falcore.NewBufferPool(100, 1024)
 	return sbf
 }
-func (sbf *StringBodyFilter) FilterRequest(request *Request) *http.Response {
+func (sbf *StringBodyFilter) FilterRequest(request *falcore.Request) *http.Response {
 	req := request.HttpRequest
 	// This caches the request body so that multiple filters can iterate it
 	if req.Method == "POST" || req.Method == "PUT" {
 		sb, err := sbf.readRequestBody(req)
 		if sb == nil || err != nil {
 			request.CurrentStage.Status = 3 // Skip
-			Debug("%s No Req Body or Ignored: %v", request.ID, err)
+			falcore.Debug("%s No Req Body or Ignored: %v", request.ID, err)
 		}
 	} else {
 		request.CurrentStage.Status = 1 // Skip
@@ -47,10 +48,10 @@ func (sbf *StringBodyFilter) readRequestBody(r *http.Request) (sb *StringBody, e
 	if strings.SplitN(ct, ";", 2)[0] != "multipart/form-data" && r.ContentLength > 0 {
 		sb = &StringBody{}
 		const maxFormSize = int64(10 << 20) // 10 MB is a lot of text.
-		sb.bpe = sbf.pool.take(io.LimitReader(r.Body, maxFormSize+1))
+		sb.bpe = sbf.pool.Take(io.LimitReader(r.Body, maxFormSize+1))
 
 		// There shouldn't be a null byte so we should get EOF
-		b, e := sb.bpe.br.ReadBytes(0)
+		b, e := sb.bpe.Br.ReadBytes(0)
 		if e != nil && e != io.EOF {
 			return nil, e
 		}
@@ -64,15 +65,15 @@ func (sbf *StringBodyFilter) readRequestBody(r *http.Request) (sb *StringBody, e
 
 // Returns a buffer used in the FilterRequest stage to a buffer pool
 // this speeds up this filter significantly by reusing buffers
-func (sbf *StringBodyFilter) ReturnBuffer(request *Request) {
+func (sbf *StringBodyFilter) ReturnBuffer(request *falcore.Request) {
 	if sb, ok := request.HttpRequest.Body.(*StringBody); ok {
-		sbf.pool.give(sb.bpe)
+		sbf.pool.Give(sb.bpe)
 	}
 }
 
 // Insert this in the response pipeline to return the buffer pool for the request body
 // If there is an appropriate place in your flow, you can call ReturnBuffer explicitly
-func (sbf *StringBodyFilter) FilterResponse(request *Request, res *http.Response) {
+func (sbf *StringBodyFilter) FilterResponse(request *falcore.Request, res *http.Response) {
 	sbf.ReturnBuffer(request)
 }
 

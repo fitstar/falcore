@@ -1,4 +1,4 @@
-package etag
+package filter
 
 import (
 	"bufio"
@@ -13,40 +13,40 @@ import (
 	"time"
 )
 
-var srv *falcore.Server
+var esrv *falcore.Server
 
 func init() {
 	go func() {
 		// falcore setup
 		pipeline := falcore.NewPipeline()
 		pipeline.Upstream.PushBack(falcore.NewRequestFilter(func(req *falcore.Request) *http.Response {
-			for _, data := range serverData {
+			for _, data := range eserverData {
 				if data.path == req.HttpRequest.URL.Path {
 					header := make(http.Header)
 					header.Set("Etag", data.etag)
-					return falcore.SimpleResponse(req.HttpRequest, data.status, header, string(data.body))
+					return falcore.StringResponse(req.HttpRequest, data.status, header, string(data.body))
 				}
 			}
-			return falcore.SimpleResponse(req.HttpRequest, 404, nil, "Not Found")
+			return falcore.StringResponse(req.HttpRequest, 404, nil, "Not Found")
 		}))
 
-		pipeline.Downstream.PushBack(new(Filter))
+		pipeline.Downstream.PushBack(new(EtagFilter))
 
-		srv = falcore.NewServer(0, pipeline)
-		if err := srv.ListenAndServe(); err != nil {
+		esrv = falcore.NewServer(0, pipeline)
+		if err := esrv.ListenAndServe(); err != nil {
 			panic("Could not start falcore")
 		}
 	}()
 }
 
-func port() int {
-	for srv.Port() == 0 {
+func eport() int {
+	for esrv.Port() == 0 {
 		time.Sleep(1e7)
 	}
-	return srv.Port()
+	return esrv.Port()
 }
 
-var serverData = []struct {
+var eserverData = []struct {
 	path   string
 	status int
 	etag   string
@@ -66,7 +66,7 @@ var serverData = []struct {
 	},
 }
 
-var testData = []struct {
+var etestData = []struct {
 	name string
 	// input
 	path string
@@ -98,10 +98,10 @@ var testData = []struct {
 	},
 }
 
-func get(p string, etag string) (r *http.Response, err error) {
+func eget(p string, etag string) (r *http.Response, err error) {
 	var conn net.Conn
-	if conn, err = net.Dial("tcp", fmt.Sprintf("localhost:%v", port())); err == nil {
-		req, _ := http.NewRequest("GET", fmt.Sprintf("http://%v", path.Join(fmt.Sprintf("localhost:%v/", port()), p)), nil)
+	if conn, err = net.Dial("tcp", fmt.Sprintf("localhost:%v", eport())); err == nil {
+		req, _ := http.NewRequest("GET", fmt.Sprintf("http://%v", path.Join(fmt.Sprintf("localhost:%v/", eport()), p)), nil)
 		req.Header.Set("If-None-Match", etag)
 		req.Write(conn)
 		buf := bufio.NewReader(conn)
@@ -112,8 +112,8 @@ func get(p string, etag string) (r *http.Response, err error) {
 
 func TestEtagFilter(t *testing.T) {
 	// select{}
-	for _, test := range testData {
-		if res, err := get(test.path, test.etag); err == nil {
+	for _, test := range etestData {
+		if res, err := eget(test.path, test.etag); err == nil {
 			bodyBuf := new(bytes.Buffer)
 			io.Copy(bodyBuf, res.Body)
 			body := bodyBuf.Bytes()

@@ -1,4 +1,4 @@
-package upstream
+package filter
 
 import (
 	"strconv"
@@ -8,7 +8,7 @@ import (
 )
 
 // fixme: probably should use net.SplitHostPort
-func SplitHostPort(hostPort string, defaultPort int)(string, int){
+func SplitHostPort(hostPort string, defaultPort int) (string, int) {
 	parts := strings.Split(hostPort, ":")
 	upstreamHost := parts[0]
 	upstreamPort := defaultPort

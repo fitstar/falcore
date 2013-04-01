@@ -1,4 +1,4 @@
-package compression
+package filter
 
 import (
 	"bufio"
@@ -16,41 +16,41 @@ import (
 	"time"
 )
 
-var srv *falcore.Server
+var ccsrv *falcore.Server
 
 func init() {
 	go func() {
 		// falcore setup
 		pipeline := falcore.NewPipeline()
 		pipeline.Upstream.PushBack(falcore.NewRequestFilter(func(req *falcore.Request) *http.Response {
-			for _, data := range serverData {
+			for _, data := range ccserverData {
 				if data.path == req.HttpRequest.URL.Path {
 					header := make(http.Header)
 					header.Set("Content-Type", data.mime)
 					header.Set("Content-Encoding", data.encoding)
-					return falcore.SimpleResponse(req.HttpRequest, 200, header, string(data.body))
+					return falcore.StringResponse(req.HttpRequest, 200, header, string(data.body))
 				}
 			}
-			return falcore.SimpleResponse(req.HttpRequest, 404, nil, "Not Found")
+			return falcore.StringResponse(req.HttpRequest, 404, nil, "Not Found")
 		}))
 
-		pipeline.Downstream.PushBack(NewFilter(nil))
+		pipeline.Downstream.PushBack(NewCompressionFilter(nil))
 
-		srv = falcore.NewServer(0, pipeline)
-		if err := srv.ListenAndServe(); err != nil {
+		ccsrv = falcore.NewServer(0, pipeline)
+		if err := ccsrv.ListenAndServe(); err != nil {
 			panic("Could not start falcore")
 		}
 	}()
 }
 
-func port() int {
-	for srv.Port() == 0 {
+func ccport() int {
+	for ccsrv.Port() == 0 {
 		time.Sleep(1e7)
 	}
-	return srv.Port()
+	return ccsrv.Port()
 }
 
-var serverData = []struct {
+var ccserverData = []struct {
 	path     string
 	mime     string
 	encoding string
@@ -161,10 +161,10 @@ func readfile(path string) []byte {
 	return nil
 }
 
-func get(p string, accept string) (r *http.Response, err error) {
+func ctget(p string, accept string) (r *http.Response, err error) {
 	var conn net.Conn
-	if conn, err = net.Dial("tcp", fmt.Sprintf("localhost:%v", port())); err == nil {
-		req, _ := http.NewRequest("GET", fmt.Sprintf("http://%v", path.Join(fmt.Sprintf("localhost:%v/", port()), p)), nil)
+	if conn, err = net.Dial("tcp", fmt.Sprintf("localhost:%v", ccport())); err == nil {
+		req, _ := http.NewRequest("GET", fmt.Sprintf("http://%v", path.Join(fmt.Sprintf("localhost:%v/", ccport()), p)), nil)
 		req.Header.Set("Accept-Encoding", accept)
 		req.Write(conn)
 		buf := bufio.NewReader(conn)
@@ -176,7 +176,7 @@ func get(p string, accept string) (r *http.Response, err error) {
 func TestCompressionFilter(t *testing.T) {
 	// select{}
 	for _, test := range testData {
-		if res, err := get(test.path, test.accept); err == nil {
+		if res, err := ctget(test.path, test.accept); err == nil {
 			bodyBuf := new(bytes.Buffer)
 			io.Copy(bodyBuf, res.Body)
 			body := bodyBuf.Bytes()

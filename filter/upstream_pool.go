@@ -1,4 +1,4 @@
-package upstream
+package filter
 
 import (
 	"github.com/fitstar/falcore"

@@ -1,4 +1,4 @@
-package static_file
+package filter
 
 import (
 	"bytes"
@@ -30,7 +30,7 @@ func init() {
 
 		// falcore setup
 		pipeline := falcore.NewPipeline()
-		pipeline.Upstream.PushBack(&Filter{
+		pipeline.Upstream.PushBack(&FileFilter{
 			PathPrefix: "/",
 			BasePath:   "../test/",
 		})

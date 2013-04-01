@@ -1,7 +1,8 @@
-package falcore
+package filter
 
 import (
 	"fmt"
+	"github.com/fitstar/falcore"
 	"io"
 	"net/http"
 )
@@ -17,7 +18,7 @@ func NewHandlerFilter(handler http.Handler) *HandlerFilter {
 	return &HandlerFilter{handler: handler}
 }
 
-func (h *HandlerFilter) FilterRequest(req *Request) *http.Response {
+func (h *HandlerFilter) FilterRequest(req *falcore.Request) *http.Response {
 	rw, respc := newPopulateResponseWriter(req.HttpRequest)
 	// this must be done concurrently so that the HandlerFunc can write the response
 	// while falcore is copying it to the socket
