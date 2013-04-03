@@ -221,6 +221,7 @@ func (srv *Server) handler(c net.Conn) {
 			pssInit.Name = "server.Init"
 			pssInit.StartTime = startTime
 			pssInit.EndTime = time.Now()
+			pssInit.Type = PipelineStageTypeOverhead
 			request.appendPipelineStage(pssInit)
 			// execute the pipeline
 			if res = srv.Pipeline.execute(request); res == nil {
@@ -228,6 +229,7 @@ func (srv *Server) handler(c net.Conn) {
 			}
 			// cleanup
 			request.startPipelineStage("server.ResponseWrite")
+			request.CurrentStage.Type = PipelineStageTypeOverhead
 			req.Body.Close()
 
 			// shutting down?

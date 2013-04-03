@@ -42,6 +42,7 @@ func (p *Pipeline) execute(req *Request) (res *http.Response) {
 		case Router:
 			t := reflect.TypeOf(filter)
 			req.startPipelineStage(t.String())
+			req.CurrentStage.Type = PipelineStageTypeRouter
 			pipe := filter.SelectPipeline(req)
 			req.finishPipelineStage()
 			if pipe != nil {
@@ -72,6 +73,7 @@ func (p *Pipeline) execFilter(req *Request, filter RequestFilter) *http.Response
 	if _, skipTracking := filter.(*Pipeline); !skipTracking {
 		t := reflect.TypeOf(filter)
 		req.startPipelineStage(t.String())
+		req.CurrentStage.Type = PipelineStageTypeUpstream
 		defer req.finishPipelineStage()
 	}
 	return filter.FilterRequest(req)
@@ -82,6 +84,7 @@ func (p *Pipeline) down(req *Request, res *http.Response) {
 		if filter, ok := e.Value.(ResponseFilter); ok {
 			t := reflect.TypeOf(filter)
 			req.startPipelineStage(t.String())
+			req.CurrentStage.Type = PipelineStageTypeDownstream
 			filter.FilterResponse(req, res)
 			req.finishPipelineStage()
 		} else {
