@@ -193,6 +193,36 @@ func (srv *Server) sentinel(c net.Conn, connClosed chan int) {
 	}
 }
 
+// For compatibility with net/http.Server or Google App Engine
+// If you are using falcore.Server as a net/http.Handler, you should
+// not call any of the Listen methods
+func (srv *Server) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
+	// We can't get the connection in this case.  
+	// Need to be really careful about how we use this property elsewhere.
+	request := newRequest(req, nil, time.Now())
+	res := srv.handlerExecutePipeline(request)
+	
+	// Copy headers
+	theHeader := wr.Header()
+	for key, header := range res.Header {
+		theHeader[key] = header
+	}
+	
+	// Write headers
+	wr.WriteHeader(res.StatusCode)
+	
+	// Write Body
+	request.startPipelineStage("server.ResponseWrite")
+	if res.Body != nil {
+		defer res.Body.Close()
+		io.Copy(wr, res.Body)
+	}
+	request.finishPipelineStage()
+	request.finishRequest()
+
+	srv.requestFinished(request, res)
+}
+
 func (srv *Server) handler(c net.Conn) {
 	var startTime time.Time
 	bpe := srv.bufferPool.Take(c)
@@ -215,20 +245,14 @@ func (srv *Server) handler(c net.Conn) {
 			}
 			request := newRequest(req, c, startTime)
 			reqCount++
-			var res *http.Response
 
 			pssInit := new(PipelineStageStat)
 			pssInit.Name = "server.Init"
 			pssInit.StartTime = startTime
 			pssInit.EndTime = time.Now()
 			request.appendPipelineStage(pssInit)
-			// execute the pipeline
-			if res = srv.Pipeline.execute(request); res == nil {
-				res = StringResponse(req, 404, nil, "Not Found")
-			}
-			// cleanup
-			request.startPipelineStage("server.ResponseWrite")
-			req.Body.Close()
+
+			var res = srv.handlerExecutePipeline(request)
 
 			// shutting down?
 			select {
@@ -237,36 +261,9 @@ func (srv *Server) handler(c net.Conn) {
 				res.Close = true
 			default:
 			}
-			// The res.Write omits Content-length on 0 length bodies, and by spec,
-			// it SHOULD. While this is not MUST, it's kinda broken.  See sec 4.4
-			// of rfc2616 and a 200 with a zero length does not satisfy any of the
-			// 5 conditions if Connection: keep-alive is set :(
-			// I'm forcing chunked which seems to work because I couldn't get the
-			// content length to write if it was 0.
-			// Specifically, the android http client waits forever if there's no
-			// content-length instead of assuming zero at the end of headers. der.
-			if res.ContentLength == 0 && len(res.TransferEncoding) == 0 && !((res.StatusCode-100 < 100) || res.StatusCode == 204 || res.StatusCode == 304) {
-				res.TransferEncoding = []string{"identity"}
-			}
-			if res.ContentLength < 0 {
-				res.TransferEncoding = []string{"chunked"}
-			}
 
 			// write response
-			if srv.sendfile {
-				res.Write(c)
-				srv.cycleNonBlock(c)
-			} else {
-				wbuf := bufio.NewWriter(c)
-				res.Write(wbuf)
-				wbuf.Flush()
-			}
-			if res.Body != nil {
-				res.Body.Close()
-			}
-			request.finishPipelineStage()
-			request.finishRequest()
-			srv.requestFinished(request, res)
+			srv.handlerWriteResponse(request, res, c)
 
 			if res.Close {
 				keepAlive = false
@@ -279,6 +276,53 @@ func (srv *Server) handler(c net.Conn) {
 		}
 	}
 	//Debug("%s Processed %v requests on connection %v", srv.serverLogPrefix(), reqCount, c.RemoteAddr())
+}
+
+func (srv *Server) handlerExecutePipeline(request *Request)*http.Response {
+	var res *http.Response
+	// execute the pipeline
+	if res = srv.Pipeline.execute(request); res == nil {
+		res = StringResponse(request.HttpRequest, 404, nil, "Not Found")
+	}
+
+	// The res.Write omits Content-length on 0 length bodies, and by spec,
+	// it SHOULD. While this is not MUST, it's kinda broken.  See sec 4.4
+	// of rfc2616 and a 200 with a zero length does not satisfy any of the
+	// 5 conditions if Connection: keep-alive is set :(
+	// I'm forcing chunked which seems to work because I couldn't get the
+	// content length to write if it was 0.
+	// Specifically, the android http client waits forever if there's no
+	// content-length instead of assuming zero at the end of headers. der.
+	if res.ContentLength == 0 && len(res.TransferEncoding) == 0 && !((res.StatusCode-100 < 100) || res.StatusCode == 204 || res.StatusCode == 304) {
+		request.HttpRequest.TransferEncoding = []string{"identity"}
+	}
+	if res.ContentLength < 0 {
+		request.HttpRequest.TransferEncoding = []string{"chunked"}
+	}
+
+	// cleanup
+	request.HttpRequest.Body.Close()
+	return res
+}
+
+func (srv *Server) handlerWriteResponse(request *Request, res *http.Response, c io.WriteCloser) {
+	request.startPipelineStage("server.ResponseWrite")
+	if srv.sendfile {
+		res.Write(c)
+		if conn, ok := c.(net.Conn); ok {
+			srv.cycleNonBlock(conn)
+		}
+	} else {
+		wbuf := bufio.NewWriter(c)
+		res.Write(wbuf)
+		wbuf.Flush()
+	}
+	if res.Body != nil {
+		res.Body.Close()
+	}
+	request.finishPipelineStage()
+	request.finishRequest()
+	srv.requestFinished(request, res)
 }
 
 func (srv *Server) serverLogPrefix() string {

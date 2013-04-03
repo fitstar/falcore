@@ -42,7 +42,7 @@ type Request struct {
 	StartTime          time.Time
 	EndTime            time.Time
 	HttpRequest        *http.Request
-	Connection         net.Conn
+	connection         net.Conn
 	RemoteAddr         *net.TCPAddr
 	PipelineStageStats *list.List
 	CurrentStage       *PipelineStageStat
@@ -58,7 +58,7 @@ func newRequest(request *http.Request, conn net.Conn, startTime time.Time) *Requ
 	fReq.Context = make(map[string]interface{})
 	fReq.HttpRequest = request
 	fReq.StartTime = startTime
-	fReq.Connection = conn
+	fReq.connection = conn
 	if conn != nil {
 		fReq.RemoteAddr = conn.RemoteAddr().(*net.TCPAddr)
 	}
@@ -72,7 +72,10 @@ func newRequest(request *http.Request, conn net.Conn, startTime time.Time) *Requ
 	fReq.pipelineHash = crc32.NewIEEE()
 
 	// Support for 100-continue requests
-	if request.Header.Get("Expect") == "100-continue" {
+	// http.Server (and presumably google app engine) already handle this
+	// case.  So we don't need to do anything if we don't own the
+	// connection.
+	if conn != nil && request.Header.Get("Expect") == "100-continue" {
 		request.Body = &continueReader{req: fReq, r: request.Body}
 	}
 
