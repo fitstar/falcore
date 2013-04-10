@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"time"
+	"fmt"
 )
 
 type passThruReadCloser struct {
@@ -15,6 +16,8 @@ type passThruReadCloser struct {
 }
 
 type Upstream struct {
+	// Name, if set, is used in logging and request stats
+	Name string
 	Transport *UpstreamTransport
 	// Will ignore https on the incoming request and always upstream http
 	ForceHttp bool
@@ -31,6 +34,10 @@ func NewUpstream(transport *UpstreamTransport) *Upstream {
 func (u *Upstream) FilterRequest(request *falcore.Request) (res *http.Response) {
 	var err error
 	req := request.HttpRequest
+
+	if u.Name != "" {
+		request.CurrentStage.Name = fmt.Sprintf("%s[%s]", request.CurrentStage.Name, u.Name)
+	}
 
 	// Force the upstream to use http 
 	if u.ForceHttp || req.URL.Scheme == "" {
@@ -86,16 +93,16 @@ func (u *Upstream) FilterRequest(request *falcore.Request) (res *http.Response) 
 		}
 	} else {
 		if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
-			falcore.Error("%s Upstream Timeout error: %v", request.ID, err)
+			falcore.Error("%s [%s] Upstream Timeout error: %v", request.ID, u.Name, err)
 			res = falcore.StringResponse(req, 504, nil, "Gateway Timeout\n")
 			request.CurrentStage.Status = 2 // Fail
 		} else {
-			falcore.Error("%s Upstream error: %v", request.ID, err)
+			falcore.Error("%s [%s] Upstream error: %v", request.ID, u.Name, err)
 			res = falcore.StringResponse(req, 502, nil, "Bad Gateway\n")
 			request.CurrentStage.Status = 2 // Fail
 		}
 	}
-	falcore.Debug("%s [%s] [%s] %s s=%d Time=%.4f", request.ID, req.Method, u.Transport.host, req.URL, res.StatusCode, diff)
+	falcore.Debug("%s %s [%s] [%s] %s s=%d Time=%.4f", request.ID, u.Name, req.Method, u.Transport.host, req.URL, res.StatusCode, diff)
 	return
 }
 
@@ -112,7 +119,7 @@ func (u *Upstream) ping() (up bool, ok bool) {
 		res, err := u.Transport.transport.RoundTrip(request)
 
 		if err != nil {
-			falcore.Error("Failed Ping to %v:%v: %v", u.Transport.host, u.Transport.port, err)
+			falcore.Error("[%s] Failed Ping to %v:%v: %v", u.Name, u.Transport.host, u.Transport.port, err)
 			return false, true
 		} else {
 			res.Body.Close()
@@ -120,7 +127,7 @@ func (u *Upstream) ping() (up bool, ok bool) {
 		if res.StatusCode == 200 {
 			return true, true
 		}
-		falcore.Error("Failed Ping to %v:%v: %v", u.Transport.host, u.Transport.port, res.Status)
+		falcore.Error("[%s] Failed Ping to %v:%v: %v", u.Name, u.Transport.host, u.Transport.port, res.Status)
 		// bad status
 		return false, true
 	}
