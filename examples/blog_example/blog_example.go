@@ -51,5 +51,5 @@ func (f helloFilter) FilterRequest(req *falcore.Request) *http.Response {
 }
 
 var reqCB = func(req *falcore.Request, res *http.Response) {
-	req.Trace() // Prints detailed stats about the request to the log
+	req.Trace(res) // Prints detailed stats about the request to the log
 }

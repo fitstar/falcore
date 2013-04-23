@@ -4,8 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/fitstar/falcore"
-	"github.com/fitstar/falcore/compression"
-	"github.com/fitstar/falcore/static_file"
+	"github.com/fitstar/falcore/filter"
 	"net/http"
 )
 
@@ -32,12 +31,12 @@ func main() {
 		return nil
 	}))
 	// Serve files
-	pipeline.Upstream.PushBack(&static_file.Filter{
+	pipeline.Upstream.PushBack(&filter.FileFilter{
 		BasePath: *path,
 	})
 
 	// downstream
-	pipeline.Downstream.PushBack(compression.NewFilter(nil))
+	pipeline.Downstream.PushBack(filter.NewCompressionFilter(nil))
 
 	// setup server
 	server := falcore.NewServer(*port, pipeline)
