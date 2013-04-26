@@ -200,17 +200,17 @@ func (srv *Server) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	// We can't get the connection in this case.  
 	// Need to be really careful about how we use this property elsewhere.
 	request := newRequest(req, nil, time.Now())
-	res := srv.handlerExecutePipeline(request)
-	
+	res := srv.handlerExecutePipeline(request, false)
+
 	// Copy headers
 	theHeader := wr.Header()
 	for key, header := range res.Header {
 		theHeader[key] = header
 	}
-	
+
 	// Write headers
 	wr.WriteHeader(res.StatusCode)
-	
+
 	// Write Body
 	request.startPipelineStage("server.ResponseWrite")
 	if res.Body != nil {
@@ -254,7 +254,7 @@ func (srv *Server) handler(c net.Conn) {
 			request.appendPipelineStage(pssInit)
 
 			// execute the pipeline
-			var res = srv.handlerExecutePipeline(request)
+			var res = srv.handlerExecutePipeline(request, keepAlive)
 
 			// shutting down?
 			select {
@@ -280,7 +280,7 @@ func (srv *Server) handler(c net.Conn) {
 	//Debug("%s Processed %v requests on connection %v", srv.serverLogPrefix(), reqCount, c.RemoteAddr())
 }
 
-func (srv *Server) handlerExecutePipeline(request *Request)*http.Response {
+func (srv *Server) handlerExecutePipeline(request *Request, keepAlive bool) *http.Response {
 	var res *http.Response
 	// execute the pipeline
 	if res = srv.Pipeline.execute(request); res == nil {
@@ -300,6 +300,12 @@ func (srv *Server) handlerExecutePipeline(request *Request)*http.Response {
 	}
 	if res.ContentLength < 0 {
 		request.HttpRequest.TransferEncoding = []string{"chunked"}
+	}
+
+	// For HTTP/1.0 and Keep-Alive, sending the Connection: Keep-Alive response header is required
+	// because close is default (opposite of 1.1)
+	if keepAlive && !request.HttpRequest.ProtoAtLeast(1, 1) {
+		res.Header.Add("Connection", "Keep-Alive")
 	}
 
 	// cleanup
