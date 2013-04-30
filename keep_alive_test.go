@@ -1,35 +1,35 @@
 package falcore
 
 import (
-	"testing"
-	"net"
-	"fmt"
-	"net/http"
 	"bufio"
+	"fmt"
+	"net"
+	"net/http"
+	"testing"
 )
 
-var keepAliveTestData = []struct{
-	name string
-	version int
-	useHeader bool
+var keepAliveTestData = []struct {
+	name            string
+	version         int
+	useHeader       bool
 	shouldKeepAlive bool
 }{
-	{ "1.0", 0, true, true },
-	{ "1.0 no KA", 0, false, false },
-	{ "1.1", 1, true, true },
-	{ "1.1 no KA", 1, false, true },
+	{"1.0", 0, true, true},
+	{"1.0 no KA", 0, false, false},
+	{"1.1", 1, true, true},
+	{"1.1 no KA", 1, false, true},
 }
 
-func TestKeepAlive(t *testing.T){
+func TestKeepAlive(t *testing.T) {
 	// Startup a basic server and get the port
 	pipeline := NewPipeline()
 	srv := NewServer(0, pipeline)
-	go func(){
+	go func() {
 		srv.ListenAndServe()
 	}()
-	<- srv.AcceptReady
+	<-srv.AcceptReady
 	serverPort := srv.Port()
-	
+
 	// Connect and make some requests
 	// Not using http.Client because transport does too many magics
 	for _, test := range keepAliveTestData {
@@ -66,8 +66,7 @@ func TestKeepAlive(t *testing.T){
 		}
 		conn.Close()
 	}
-	
+
 	// Clean up
 	srv.StopAccepting()
 }
-

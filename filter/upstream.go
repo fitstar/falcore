@@ -2,12 +2,12 @@ package filter
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/fitstar/falcore"
 	"io"
 	"net"
 	"net/http"
 	"time"
-	"fmt"
 )
 
 type passThruReadCloser struct {
@@ -17,7 +17,7 @@ type passThruReadCloser struct {
 
 type Upstream struct {
 	// Name, if set, is used in logging and request stats
-	Name string
+	Name      string
 	Transport *UpstreamTransport
 	// Will ignore https on the incoming request and always upstream http
 	ForceHttp bool
@@ -39,7 +39,7 @@ func (u *Upstream) FilterRequest(request *falcore.Request) (res *http.Response) 
 		request.CurrentStage.Name = fmt.Sprintf("%s[%s]", request.CurrentStage.Name, u.Name)
 	}
 
-	// Force the upstream to use http 
+	// Force the upstream to use http
 	if u.ForceHttp || req.URL.Scheme == "" {
 		req.URL.Scheme = "http"
 		req.URL.Host = req.Host

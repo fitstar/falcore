@@ -9,7 +9,7 @@ import (
 
 // Pipelines have an Upstream and Downstream list of filters.
 // FilterRequest is called with the Request for all the items in
-// the Upstream list in order UNTIL a Response is returned.  
+// the Upstream list in order UNTIL a Response is returned.
 // Once a Response is returned iteration through the Upstream list
 // is ended, and FilterResponse is called for ALL ResponseFilters
 // in the Downstream list, in order.

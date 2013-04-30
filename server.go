@@ -197,7 +197,7 @@ func (srv *Server) sentinel(c net.Conn, connClosed chan int) {
 // If you are using falcore.Server as a net/http.Handler, you should
 // not call any of the Listen methods
 func (srv *Server) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
-	// We can't get the connection in this case.  
+	// We can't get the connection in this case.
 	// Need to be really careful about how we use this property elsewhere.
 	request := newRequest(req, nil, time.Now())
 	res := srv.handlerExecutePipeline(request, false)

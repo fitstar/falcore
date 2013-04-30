@@ -9,12 +9,12 @@ import (
 // the response's Etag header against the request's If-None-Match
 // header.  If they match, the filter will return a '304 Not Modifed'
 // status and no body.
-// 
+//
 // Ideally, Etag filtering is performed as soon as possible as
 // you may be able to skip generating the response body at all.
 // Even as a last step, you will see a significant benefit if
 // clients are well behaved.
-// 
+//
 type EtagFilter struct {
 }
 

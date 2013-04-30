@@ -25,7 +25,7 @@ func main() {
 	server.CompletionCallback = reqCB
 
 	// start the server
-	// this is normally blocking forever unless you send lifecycle commands 
+	// this is normally blocking forever unless you send lifecycle commands
 	if err := server.ListenAndServe(); err != nil {
 		fmt.Println("Could not start server:", err)
 	}

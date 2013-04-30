@@ -43,14 +43,14 @@ func main() {
 	go handleSignals(srv)
 
 	// start the server
-	// this is normally blocking forever unless you send lifecycle commands 
+	// this is normally blocking forever unless you send lifecycle commands
 	if err := srv.ListenAndServe(); err != nil {
 		fmt.Printf("%v Could not start server: %v", pid, err)
 	}
 	fmt.Printf("%v Exiting now\n", pid)
 }
 
-// blocks on the server ready and when ready, it sends 
+// blocks on the server ready and when ready, it sends
 // a signal to the parent so that it knows it cna now exit
 func childReady(srv *falcore.Server) {
 	pid := syscall.Getpid()

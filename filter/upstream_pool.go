@@ -25,7 +25,7 @@ type UpstreamPool struct {
 	pinger       *time.Ticker
 }
 
-// The config consists of a map of the servers in the pool in the format host_or_ip:port 
+// The config consists of a map of the servers in the pool in the format host_or_ip:port
 // where port is optional and defaults to 80.  The map value is an int with the weight
 // only 0 and 1 are supported weights (0 disables a server and 1 enables it)
 func NewUpstreamPool(name string, upstreams []*UpstreamEntry) *UpstreamPool {
