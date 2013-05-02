@@ -180,6 +180,10 @@ func TestCompressionFilter(t *testing.T) {
 			bodyBuf := new(bytes.Buffer)
 			io.Copy(bodyBuf, res.Body)
 			body := bodyBuf.Bytes()
+			var isChunked bool = res.TransferEncoding != nil && len(res.TransferEncoding) > 0 && res.TransferEncoding[0] == "chunked"
+			if !isChunked && res.ContentLength != int64(len(body)) {
+				t.Errorf("%v Invalid content length.  %v != %v", test.name, res.ContentLength, len(body))
+			}
 			if enc := res.Header.Get("Content-Encoding"); enc != test.encoding {
 				t.Errorf("%v Header mismatch. Expecting: %v Got: %v", test.name, test.encoding, enc)
 			}

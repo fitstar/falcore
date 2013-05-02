@@ -20,7 +20,7 @@ func SimpleResponse(req *http.Request, status int, headers http.Header, contentL
 	res.Header = make(map[string][]string)
 	if body_rdr, ok := body.(io.ReadCloser); ok {
 		res.Body = body_rdr
-	} else {
+	} else if body != nil {
 		res.Body = ioutil.NopCloser(body)
 	}
 	if headers != nil {
