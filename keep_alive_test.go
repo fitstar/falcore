@@ -39,20 +39,18 @@ func TestKeepAlive(t *testing.T) {
 			t.Fatal("Couldn't connect")
 		}
 		for i := 0; i < 5; i++ {
-			req, _ := http.NewRequest("GET", "/", nil)
-			req.ProtoMinor = test.version
-			req.Proto = fmt.Sprintf("HTTP/1.%v", test.version)
+			header := "\r\n"
 			if test.useHeader {
-				req.Header.Set("Connection", "Keep-Alive")
+				header = "Connection: Keep-Alive\r\n" + header
 			}
-			if err = req.Write(conn); err != nil {
+			if _, err = fmt.Fprintf(conn, "GET / HTTP/1.%d\r\n%s", test.version, header); err != nil {
 				if test.shouldKeepAlive {
 					t.Error(fmt.Sprintf("[%v:%v] Couldn't write request: %v", test.name, i, err))
 				}
 				break
 			}
-			
-			res, err := http.ReadResponse(bconn, req)
+
+			res, err := http.ReadResponse(bconn, &http.Request{})
 			if err != nil {
 				if test.shouldKeepAlive {
 					t.Error(fmt.Sprintf("[%v:%v] Couldn't read response: %v", test.name, i, err))

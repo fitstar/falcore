@@ -12,6 +12,7 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -240,7 +241,11 @@ func (srv *Server) handler(c net.Conn) {
 			startTime = time.Now()
 		}
 		if req, err = http.ReadRequest(bpe.Br); err == nil {
-			if req.Header.Get("Connection") != "Keep-Alive" {
+			if req.ProtoAtLeast(1, 1) {
+				if req.Header.Get("Connection") == "close" {
+					keepAlive = false
+				}
+			} else if strings.ToLower(req.Header.Get("Connection")) != "keep-alive" {
 				keepAlive = false
 			}
 			request := newRequest(req, c, startTime)
