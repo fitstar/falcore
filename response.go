@@ -11,27 +11,21 @@ import (
 
 // Generate an http.Response using the basic fields
 func SimpleResponse(req *http.Request, status int, headers http.Header, contentLength int64, body io.Reader) *http.Response {
-	res := new(http.Response)
-	res.StatusCode = status
-	res.ProtoMajor = 1
-	res.ProtoMinor = 1
-	res.ContentLength = contentLength
-	res.Request = req
-	res.Header = make(map[string][]string)
-	if body_rdr, ok := body.(io.ReadCloser); ok {
-		res.Body = body_rdr
+	res := &http.Response{StatusCode: status, ProtoMajor: 1, ProtoMinor: 1, ContentLength: contentLength, Request: req}
+	if rc, ok := body.(io.ReadCloser); ok {
+		res.Body = rc
 	} else {
 		res.Body = ioutil.NopCloser(body)
 	}
-	if headers != nil {
-		res.Header = headers
+	if res.Header == nil {
+		res.Header = make(http.Header)
 	}
 	return res
 }
 
 // Like SimpleResponse but uses a []byte for the body.
 func ByteResponse(req *http.Request, status int, headers http.Header, body []byte) *http.Response {
-	return SimpleResponse(req, status, headers, int64(len(body)), bytes.NewBuffer(body))
+	return SimpleResponse(req, status, headers, int64(len(body)), bytes.NewReader(body))
 }
 
 // Like StringResponse but uses a string for the body.
