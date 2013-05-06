@@ -303,7 +303,9 @@ func (srv *Server) handlerExecutePipeline(request *Request, keepAlive bool) *htt
 	// Specifically, the android http client waits forever if there's no
 	// content-length instead of assuming zero at the end of headers. der.
 	if res.Body == nil {
-		res.ContentLength = 0
+		if request.HttpRequest.Method != "HEAD" {
+			res.ContentLength = 0
+		}
 		res.TransferEncoding = []string{"identity"}
 		res.Body = ioutil.NopCloser(bytes.NewBuffer([]byte{}))
 	} else if res.ContentLength == 0 && len(res.TransferEncoding) == 0 && !((res.StatusCode-100 < 100) || res.StatusCode == 204 || res.StatusCode == 304) {
@@ -324,7 +326,7 @@ func (srv *Server) handlerExecutePipeline(request *Request, keepAlive bool) *htt
 			res.TransferEncoding = []string{"identity"}
 		}
 	}
-	if res.ContentLength < 0 {
+	if res.ContentLength < 0 && request.HttpRequest.Method != "HEAD" {
 		res.TransferEncoding = []string{"chunked"}
 	}
 
