@@ -12,7 +12,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -30,9 +29,8 @@ type Server struct {
 	handlerWaitGroup   *sync.WaitGroup
 	logPrefix          string
 	AcceptReady        chan int
-	sendfile           bool
-	sockOpt            int
 	bufferPool         *BufferPool
+	writeBufferPool *WriteBufferPool
 }
 
 type RequestCompletionCallback func(req *Request, res *http.Response)
@@ -46,22 +44,9 @@ func NewServer(port int, pipeline *Pipeline) *Server {
 	s.handlerWaitGroup = new(sync.WaitGroup)
 	s.logPrefix = fmt.Sprintf("%d", syscall.Getpid())
 
-	// openbsd/netbsd don't have TCP_NOPUSH so it's likely sendfile will be slower
-	// without these socket options, just enable for linux, mac and freebsd.
-	// TODO (Graham) windows has TransmitFile zero-copy mechanism, try to use it
-	switch runtime.GOOS {
-	case "linux":
-		s.sendfile = true
-		s.sockOpt = 0x3 // syscall.TCP_CORK
-	case "freebsd", "darwin":
-		s.sendfile = true
-		s.sockOpt = 0x4 // syscall.TCP_NOPUSH
-	default:
-		s.sendfile = false
-	}
-
 	// buffer pool for reusing connection bufio.Readers
 	s.bufferPool = NewBufferPool(100, 8192)
+	s.writeBufferPool = NewWriteBufferPool(100, 4096)
 
 	return s
 }
@@ -230,6 +215,8 @@ func (srv *Server) handler(c net.Conn) {
 	var startTime time.Time
 	bpe := srv.bufferPool.Take(c)
 	defer srv.bufferPool.Give(bpe)
+	wbpe := srv.writeBufferPool.Take(c)
+	defer srv.writeBufferPool.Give(wbpe)
 	var closeSentinelChan = make(chan int)
 	go srv.sentinel(c, closeSentinelChan)
 	defer srv.connectionFinished(c, closeSentinelChan)
@@ -272,7 +259,7 @@ func (srv *Server) handler(c net.Conn) {
 			}
 
 			// write response
-			srv.handlerWriteResponse(request, res, c)
+			srv.handlerWriteResponse(request, res, c, wbpe.Br)
 
 			if res.Close {
 				keepAlive = false
@@ -288,6 +275,7 @@ func (srv *Server) handler(c net.Conn) {
 }
 
 func (srv *Server) handlerExecutePipeline(request *Request, keepAlive bool) *http.Response {
+
 	var res *http.Response
 	// execute the pipeline
 	if res = srv.Pipeline.execute(request); res == nil {
@@ -341,18 +329,18 @@ func (srv *Server) handlerExecutePipeline(request *Request, keepAlive bool) *htt
 	return res
 }
 
-func (srv *Server) handlerWriteResponse(request *Request, res *http.Response, c io.WriteCloser) {
+func (srv *Server) handlerWriteResponse(request *Request, res *http.Response, c net.Conn, bw *bufio.Writer) {
 	request.startPipelineStage("server.ResponseWrite")
 	request.CurrentStage.Type = PipelineStageTypeOverhead
-	if srv.sendfile {
-		res.Write(c)
-		if conn, ok := c.(net.Conn); ok {
-			srv.cycleNonBlock(conn)
-		}
+
+	var nodelay = srv.setNoDelay(c, false)
+	if nodelay {
+		res.Write(bw)
+		bw.Flush()
+		srv.setNoDelay(c, true)
 	} else {
-		wbuf := bufio.NewWriter(c)
-		res.Write(wbuf)
-		wbuf.Flush()
+		res.Write(bw)
+		bw.Flush()
 	}
 	if res.Body != nil {
 		res.Body.Close()
