@@ -56,7 +56,7 @@ func (p *WriteBufferPool) Give(bpe *WriteBufferPoolEntry) {
 	}
 	if err := bpe.Br.Flush(); err != nil {
 		return
-	}	
+	}
 	select {
 	case p.pool <- bpe: // return to pool
 	default: // discard

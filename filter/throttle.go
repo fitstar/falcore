@@ -8,8 +8,8 @@ import (
 	"time"
 )
 
-// Throttles incomming requests at a maximum number of 
-// requests per second.  
+// Throttles incomming requests at a maximum number of
+// requests per second.
 type Throttler struct {
 	Condition func(req *falcore.Request) bool // If this is set, and returns false, the request will not be throttled
 	count     int64

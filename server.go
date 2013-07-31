@@ -30,7 +30,7 @@ type Server struct {
 	logPrefix          string
 	AcceptReady        chan int
 	bufferPool         *BufferPool
-	writeBufferPool *WriteBufferPool
+	writeBufferPool    *WriteBufferPool
 }
 
 type RequestCompletionCallback func(req *Request, res *http.Response)

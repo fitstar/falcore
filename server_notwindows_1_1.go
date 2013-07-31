@@ -5,8 +5,8 @@ package falcore
 
 import (
 	"net"
-	"syscall"
 	"runtime"
+	"syscall"
 )
 
 // only valid on non-windows
@@ -23,7 +23,7 @@ func (srv *Server) setupNonBlockingListener(err error, l *net.TCPListener) error
 }
 
 // Used NoDelay (Nagle's algorithm) where available
-func (srv *Server) setNoDelay(c net.Conn, noDelay bool)bool {
+func (srv *Server) setNoDelay(c net.Conn, noDelay bool) bool {
 	switch runtime.GOOS {
 	case "linux", "freebsd", "darwin":
 		if tcpC, ok := c.(*net.TCPConn); ok {
