@@ -25,10 +25,10 @@ type Server struct {
 	CompletionCallback RequestCompletionCallback
 	listener           net.Listener
 	listenerFile       *os.File
-	stopAccepting      chan int
+	stopAccepting      chan struct{}
 	handlerWaitGroup   *sync.WaitGroup
 	logPrefix          string
-	AcceptReady        chan int
+	AcceptReady        chan struct{}
 	bufferPool         *BufferPool
 	writeBufferPool    *WriteBufferPool
 }
@@ -39,8 +39,8 @@ func NewServer(port int, pipeline *Pipeline) *Server {
 	s := new(Server)
 	s.Addr = fmt.Sprintf(":%v", port)
 	s.Pipeline = pipeline
-	s.stopAccepting = make(chan int)
-	s.AcceptReady = make(chan int, 1)
+	s.stopAccepting = make(chan struct{})
+	s.AcceptReady = make(chan struct{})
 	s.handlerWaitGroup = new(sync.WaitGroup)
 	s.logPrefix = fmt.Sprintf("%d", syscall.Getpid())
 
@@ -140,9 +140,9 @@ func (srv *Server) Port() int {
 }
 
 func (srv *Server) serve() (e error) {
-	var accept = true
-	srv.AcceptReady <- 1
-	for accept {
+	close(srv.AcceptReady)
+accept:
+	for {
 		var c net.Conn
 		if l, ok := srv.listener.(*net.TCPListener); ok {
 			l.SetDeadline(time.Now().Add(3 * time.Second))
@@ -163,7 +163,7 @@ func (srv *Server) serve() (e error) {
 		}
 		select {
 		case <-srv.stopAccepting:
-			accept = false
+			break accept
 		default:
 		}
 	}
@@ -173,7 +173,7 @@ func (srv *Server) serve() (e error) {
 	return nil
 }
 
-func (srv *Server) sentinel(c net.Conn, connClosed chan int) {
+func (srv *Server) sentinel(c net.Conn, connClosed chan struct{}) {
 	select {
 	case <-srv.stopAccepting:
 		c.SetReadDeadline(time.Now().Add(3 * time.Second))
@@ -217,7 +217,7 @@ func (srv *Server) handler(c net.Conn) {
 	defer srv.bufferPool.Give(bpe)
 	wbpe := srv.writeBufferPool.Take(c)
 	defer srv.writeBufferPool.Give(wbpe)
-	var closeSentinelChan = make(chan int)
+	closeSentinelChan := make(chan struct{})
 	go srv.sentinel(c, closeSentinelChan)
 	defer srv.connectionFinished(c, closeSentinelChan)
 	var err error
@@ -361,7 +361,7 @@ func (srv *Server) requestFinished(request *Request, res *http.Response) {
 	}
 }
 
-func (srv *Server) connectionFinished(c net.Conn, closeChan chan int) {
+func (srv *Server) connectionFinished(c net.Conn, closeChan chan struct{}) {
 	c.Close()
 	close(closeChan)
 	srv.handlerWaitGroup.Done()
