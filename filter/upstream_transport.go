@@ -108,13 +108,23 @@ type timeoutConnWrapper struct {
 	timeout time.Duration
 }
 
+func (cw *timeoutConnWrapper) setDeadline() error {
+	return cw.conn.SetDeadline(time.Now().Add(cw.timeout))
+}
+
 func (cw *timeoutConnWrapper) Write(b []byte) (int, error) {
-	if err := cw.conn.SetDeadline(time.Now().Add(cw.timeout)); err != nil {
+	if err := cw.setDeadline(); err != nil {
 		return 0, err
 	}
 	return cw.conn.Write(b)
 }
-func (cw *timeoutConnWrapper) Read(b []byte) (n int, err error)   { return cw.conn.Read(b) }
+
+func (cw *timeoutConnWrapper) Read(b []byte) (n int, err error) {
+	if err := cw.setDeadline(); err != nil {
+		return 0, err
+	}
+	return cw.conn.Read(b)
+}
 func (cw *timeoutConnWrapper) Close() error                       { return cw.conn.Close() }
 func (cw *timeoutConnWrapper) LocalAddr() net.Addr                { return cw.conn.LocalAddr() }
 func (cw *timeoutConnWrapper) RemoteAddr() net.Addr               { return cw.conn.RemoteAddr() }
