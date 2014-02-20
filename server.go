@@ -266,7 +266,10 @@ func (srv *Server) handler(c net.Conn) {
 			}
 
 			// write response
-			srv.handlerWriteResponse(request, res, c, wbpe.Br)
+			err = srv.handlerWriteResponse(request, res, c, wbpe.Br)
+			if err != nil {
+				Error("%s ERROR writing response: <%T %v>", srv.serverLogPrefix(), err, err)
+			}
 
 			if res.Close {
 				keepAlive = false
@@ -336,25 +339,38 @@ func (srv *Server) handlerExecutePipeline(request *Request, keepAlive bool) *htt
 	return res
 }
 
-func (srv *Server) handlerWriteResponse(request *Request, res *http.Response, c net.Conn, bw *bufio.Writer) {
+func (srv *Server) handlerWriteResponse(request *Request, res *http.Response, c net.Conn, bw *bufio.Writer) error {
+	// Setup write stage
 	request.startPipelineStage("server.ResponseWrite")
 	request.CurrentStage.Type = PipelineStageTypeOverhead
 
-	var nodelay = srv.setNoDelay(c, false)
-	if nodelay {
-		res.Write(bw)
-		bw.Flush()
-		srv.setNoDelay(c, true)
-	} else {
-		res.Write(bw)
-		bw.Flush()
+	// cleanup
+	defer func() {
+		request.finishPipelineStage()
+		request.finishRequest()
+		srv.requestFinished(request, res)
+		if res.Body != nil {
+			res.Body.Close()
+		}
+	}()
+
+	// Cycle nodelay flag on socket
+	// Note: defers for FILO so this will happen before the write
+	// 		 phase is complete, which is what we want.
+	if nodelay := srv.setNoDelay(c, false); nodelay {
+		defer srv.setNoDelay(c, true)
 	}
-	if res.Body != nil {
-		res.Body.Close()
+
+	var err error
+	// Write response
+	if err = res.Write(bw); err != nil {
+		return err
 	}
-	request.finishPipelineStage()
-	request.finishRequest()
-	srv.requestFinished(request, res)
+
+	// Flush any remaining buffer
+	err = bw.Flush()
+
+	return err
 }
 
 func (srv *Server) serverLogPrefix() string {
