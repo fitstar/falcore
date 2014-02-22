@@ -2,7 +2,7 @@ package utils
 
 import (
 	"bytes"
-	"fmt"
+	"io"
 	"testing"
 )
 
@@ -27,10 +27,10 @@ var ringBufferTestData = []struct {
 	{"w16", "w", 16, 16, nil, 16},
 	{"r32", "r", 32, 16, nil, 0},
 	{"wfull", "w", 1024, 1024, nil, 1024},
-	{"wfull", "w", 1024, 0, nil, 1024},
+	{"wfull", "w", 1024, 0, io.ErrShortWrite, 1024},
 	{"empty", "r", 1024, 1024, nil, 0},
 	{"wfill", "w", 768, 768, nil, 768},
-	{"wfill", "w", 768, 256, nil, 1024},
+	{"wfill", "w", 768, 256, io.ErrShortWrite, 1024},
 	{"empty", "r", 1024, 1024, nil, 0},
 	{"w1", "w", 1, 1, nil, 1},
 	{"r1", "r", 1, 1, nil, 0},
@@ -96,7 +96,6 @@ func TestRingBuffer(t *testing.T) {
 			}
 		}
 
-		fmt.Println(x, "==================================")
 	}
 
 }

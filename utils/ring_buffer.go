@@ -1,10 +1,8 @@
 package utils
 
 import (
-	"errors"
+	"io"
 )
-
-var RingBufferFull = errors.New("Ring buffer full")
 
 type RingBuffer struct {
 	buff []byte
@@ -65,7 +63,12 @@ func (b *RingBuffer) Write(p []byte) (int, error) {
 		b.tail = 0
 	}
 
-	return i, nil
+	var err error = nil
+	if i < len(p) {
+		err = io.ErrShortWrite
+	}
+
+	return i, err
 }
 
 func (b *RingBuffer) Free() int {
@@ -88,6 +91,10 @@ func (b *RingBuffer) Len() int {
 
 func (b *RingBuffer) Empty() bool {
 	return b.head == b.tail
+}
+
+func (b *RingBuffer) Full() bool {
+	return b.Cap() == b.Len()
 }
 
 func (b *RingBuffer) Reset() {
