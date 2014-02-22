@@ -1,8 +1,8 @@
 package utils
 
 import (
-	"fmt"
 	"bytes"
+	"fmt"
 	"testing"
 )
 
@@ -68,7 +68,7 @@ func TestRingBuffer(t *testing.T) {
 				if testI == 5 {
 					// t.Errorf("%x", b.buff)
 				}
-			
+
 			} else {
 				rdata := make([]byte, test.size)
 				expectData := make([]byte, test.opLen)
@@ -90,12 +90,12 @@ func TestRingBuffer(t *testing.T) {
 					t.Errorf("%v Data read doesn't match expectation\nEXPECTED: %x\nACTUAL:   %x", test.name, expectData, rdata[0:i])
 				}
 			}
-			
+
 			if t.Failed() {
 				return
 			}
 		}
-		
+
 		fmt.Println(x, "==================================")
 	}
 

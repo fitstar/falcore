@@ -2,7 +2,6 @@ package utils
 
 import (
 	"errors"
-	// "fmt"
 )
 
 var RingBufferFull = errors.New("Ring buffer full")
@@ -22,15 +21,10 @@ func NewRingBuffer(size int) *RingBuffer {
 func (b *RingBuffer) Read(p []byte) (int, error) {
 	var i int = 0
 
-	// fmt.Printf("R\t%04v\t%04v\t%04v\n", len(p), b.head, b.tail)
-
 	if b.tail < b.head {
 		// wraparound.  read to end
 		i += copy(p, b.buff[b.head:])
-		// fmt.Println(b.head, i)
-		j := copy(p[i:], b.buff[0:b.tail])
-		i += j
-		// fmt.Println(j, i)
+		i += copy(p[i:], b.buff[0:b.tail])
 	} else if b.tail > b.head {
 		// read to tail
 		i += copy(p, b.buff[b.head:b.tail])
@@ -38,15 +32,11 @@ func (b *RingBuffer) Read(p []byte) (int, error) {
 
 	b.head = (b.head + i) % len(b.buff)
 
-	// fmt.Printf("R\t%04v\t%04v\t%04v\t%04v\n\n", len(p), b.head, b.tail, i)
-
 	return i, nil
 }
 
 func (b *RingBuffer) Write(p []byte) (int, error) {
 	var i int = 0
-
-	// fmt.Printf("W\t%04v\t%04v\t%04v\n", len(p), b.head, b.tail)
 
 	// Write the stuff
 	if b.tail >= b.head {
@@ -74,8 +64,6 @@ func (b *RingBuffer) Write(p []byte) (int, error) {
 	if b.tail == len(b.buff) {
 		b.tail = 0
 	}
-
-	// fmt.Printf("W\t%04v\t%04v\t%04v\t%04v\n\n", len(p), b.head, b.tail, i)
 
 	return i, nil
 }
