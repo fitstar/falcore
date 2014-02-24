@@ -11,6 +11,7 @@ type bufferedPipe struct {
 	buff  *RingBuffer // the buffer
 	rwait *sync.Cond  // waiting reader
 	wwait *sync.Cond  // waiting writer
+	cwait *sync.Cond  // wait on close (for buffer reuse)
 	rerr  error       // if reader is closed, the error
 	werr  error       // if writer is closed, the error
 }
@@ -34,6 +35,7 @@ func NewBufferedPipe(buff *RingBuffer) (*BufferedPipeReader, *BufferedPipeWriter
 	pipe := &bufferedPipe{
 		l,
 		buff,
+		sync.NewCond(l),
 		sync.NewCond(l),
 		sync.NewCond(l),
 		nil,
@@ -104,6 +106,7 @@ func (p *bufferedPipe) wclose(err error) {
 	p.werr = err
 	p.rwait.Broadcast()
 	p.wwait.Broadcast()
+	p.cwait.Broadcast()
 }
 
 func (p *bufferedPipe) rclose(err error) {
@@ -115,6 +118,18 @@ func (p *bufferedPipe) rclose(err error) {
 	p.rerr = err
 	p.rwait.Broadcast()
 	p.wwait.Broadcast()
+	p.cwait.Broadcast()
+}
+
+func (p *bufferedPipe) closeWait() {
+	p.l.Lock()
+	defer p.l.Unlock()
+	for {
+		if p.werr != nil && p.rerr != nil {
+			return
+		}
+		p.cwait.Wait()
+	}
 }
 
 func (r *BufferedPipeReader) Read(p []byte) (int, error) {
@@ -130,6 +145,11 @@ func (r *BufferedPipeReader) CloseWithError(err error) error {
 	return nil
 }
 
+// Wait for both ends of the buffer to close
+func (r *BufferedPipeReader) CloseWait() {
+	r.pipe.closeWait()
+}
+
 func (w *BufferedPipeWriter) Write(p []byte) (int, error) {
 	return w.pipe.write(p)
 }
@@ -141,4 +161,9 @@ func (w *BufferedPipeWriter) Close() error {
 func (w *BufferedPipeWriter) CloseWithError(err error) error {
 	w.pipe.wclose(err)
 	return nil
+}
+
+// Wait for both ends of the buffer to close
+func (w *BufferedPipeWriter) CloseWait() {
+	w.pipe.closeWait()
 }
