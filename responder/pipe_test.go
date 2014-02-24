@@ -1,12 +1,11 @@
-package falcore
+package responder
 
 import (
-	"testing"
+	"bytes"
 	"io"
 	"io/ioutil"
 	"net/http"
-	"bytes"
-	"./utils"
+	"testing"
 )
 
 func BenchmarkPipeResponse(b *testing.B) {
@@ -14,7 +13,7 @@ func BenchmarkPipeResponse(b *testing.B) {
 	data := make([]byte, 1e7)
 	for i := 0; i < b.N; i++ {
 		wr, res := PipeResponse(req, 200, nil)
-		go func(){
+		go func() {
 			io.Copy(wr, bytes.NewBuffer(data))
 			wr.Close()
 		}()
@@ -27,9 +26,8 @@ func BenchmarkBufferedPipeResponse(b *testing.B) {
 	req, _ := http.NewRequest("GET", "/foo", nil)
 	data := make([]byte, 1e7)
 	for i := 0; i < b.N; i++ {
-		rd, wr := utils.NewBufferedPipe(utils.NewRingBuffer(1024))
-		res := SimpleResponse(req, 200, nil, -1, rd)
-		go func(){
+		wr, res := BufferedPipeResponse(req, 200, nil)
+		go func() {
 			io.Copy(wr, bytes.NewBuffer(data))
 			wr.Close()
 		}()
