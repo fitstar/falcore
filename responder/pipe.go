@@ -32,16 +32,16 @@ func BufferedPipeResponse(req *http.Request, status int, headers http.Header) (i
 	}
 
 	pR, pW := utils.NewBufferedPipe(buff)
-	
+
 	// return the buffer to the pool, leaky bucket style
-	go func(){
+	go func() {
 		pR.CloseWait()
 		select {
 		case pipeBufferPool <- buff:
 		default:
 		}
 	}()
-	
+
 	return pW, falcore.SimpleResponse(req, status, headers, -1, pR)
 }
 
