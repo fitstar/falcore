@@ -14,6 +14,7 @@ type bufferedPipe struct {
 	cwait *sync.Cond  // wait on close (for buffer reuse)
 	rerr  error       // if reader is closed, the error
 	werr  error       // if writer is closed, the error
+	more  bool        // if the writer is waiting for room to write more
 }
 
 type BufferedPipeReader struct {
@@ -40,33 +41,43 @@ func NewBufferedPipe(buff *RingBuffer) (*BufferedPipeReader, *BufferedPipeWriter
 		sync.NewCond(l),
 		nil,
 		nil,
+		false,
 	}
 
 	return &BufferedPipeReader{pipe}, &BufferedPipeWriter{pipe}
 }
 
 func (p *bufferedPipe) read(b []byte) (int, error) {
+	if len(b) == 0 {
+		return 0, nil
+	}
+
 	p.l.Lock()
 	defer p.l.Unlock()
 
+	var i int = 0
 	for {
 		if p.rerr != nil {
 			return 0, ErrClosedPipe
 		}
-		if !p.buff.Empty() {
-			break
+		if n, _ := p.buff.Read(b[i:]); n > 0 {
+			i += n
+			if i < len(b) && p.more {
+			} else {
+				break
+			}
+		} else if p.werr != nil {
+			return i, p.werr
+		} else {
+			p.wwait.Broadcast()
+			p.rwait.Wait()
 		}
-		if p.werr != nil {
-			return 0, p.werr
-		}
-		p.rwait.Wait()
 	}
-	n, err := p.buff.Read(b)
 
 	if !p.buff.Full() {
 		p.wwait.Broadcast()
 	}
-	return n, err
+	return i, nil
 }
 
 func (p *bufferedPipe) write(b []byte) (int, error) {
@@ -77,24 +88,29 @@ func (p *bufferedPipe) write(b []byte) (int, error) {
 		return 0, ErrClosedPipe
 	}
 
-	for {
+	var i int = 0
+	for i < len(b) {
+		p.more = true
 		if p.rerr != nil {
 			return 0, p.rerr
 		}
 		if p.werr != nil {
 			return 0, ErrClosedPipe
 		}
-		if !p.buff.Full() {
-			break
+		if n, _ := p.buff.Write(b[i:]); n > 0 {
+			i += n
+		} else {
+			p.rwait.Broadcast()
+			p.wwait.Wait()
 		}
-		p.wwait.Wait()
 	}
-	n, err := p.buff.Write(b)
+	p.more = false
 
 	if !p.buff.Empty() {
 		p.rwait.Broadcast()
 	}
-	return n, err
+
+	return i, nil
 }
 
 func (p *bufferedPipe) wclose(err error) {
