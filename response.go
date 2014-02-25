@@ -37,12 +37,3 @@ func ByteResponse(req *http.Request, status int, headers http.Header, body []byt
 func StringResponse(req *http.Request, status int, headers http.Header, body string) *http.Response {
 	return SimpleResponse(req, status, headers, int64(len(body)), strings.NewReader(body))
 }
-
-// Returns the write half of an io.Pipe.  The read half will be the Body of the response.
-// Use this to stream a generated body without buffering first.  Don't forget to close the writer when finished.
-// Writes are blocking until something Reads.  Best to use a separate goroutine for writing.
-// Response will be Transfer-Encoding: chunked.
-func PipeResponse(req *http.Request, status int, headers http.Header) (io.WriteCloser, *http.Response) {
-	pR, pW := io.Pipe()
-	return pW, SimpleResponse(req, status, headers, -1, pR)
-}
