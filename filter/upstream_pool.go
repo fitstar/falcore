@@ -16,8 +16,6 @@ type UpstreamEntry struct {
 // functionally equivalent.  The pool will round-robin the requests to the servers.
 type UpstreamPool struct {
 	pool         []*UpstreamEntry
-	rr_count     int
-	ping_count   int64
 	Name         string
 	nextUpstream chan *UpstreamEntry
 	shutdown     chan int
@@ -91,9 +89,10 @@ func (up UpstreamPool) Shutdown() {
 }
 
 func (up UpstreamPool) nextServer() {
-	loopCount := 0
+	var loopCount int = 0
+	var rrCount int = 0
 	for {
-		next := up.rr_count % len(up.pool)
+		next := rrCount % len(up.pool)
 		up.weightMutex.RLock()
 		wgt := up.pool[next].Weight
 		up.weightMutex.RUnlock()
@@ -109,7 +108,7 @@ func (up UpstreamPool) nextServer() {
 		} else {
 			loopCount++
 		}
-		up.rr_count++
+		rrCount++
 	}
 }
 
