@@ -181,7 +181,7 @@ func (up *UpstreamPool) nextServer() {
 		var next *upstreamEntry = nil
 		var goal = rand.Int63n(up.weightSum)
 		for _, e := range up.pool {
-			if !e.Down && e.Weight >= goal {
+			if !e.Down && e.Weight > goal {
 				next = e
 				break
 			}
