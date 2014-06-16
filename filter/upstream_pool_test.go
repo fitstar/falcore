@@ -1,36 +1,55 @@
 package filter
 
 import (
-	"testing"
-	"io/ioutil"
 	"github.com/fitstar/falcore"
+	"io/ioutil"
 	"net/http"
+	"testing"
+	"time"
 )
 
-var upstreamPoolTestData = []struct{
-	name string
+var upstreamPoolTestData = []struct {
+	name    string
 	weights []int64
-	ratio float64 // % of As
+	ratio   float64 // % of As
+	action  []string
 }{
-	{"simple", []int64{1,1}, 0.5},
-	{"double", []int64{2,1}, 0.66},
-	{"triple", []int64{3,1}, 0.75},
-	{"big", []int64{200,100}, 0.66},
-	{"single", []int64{1,0}, 1.0},
-	{"single reverse", []int64{0,1}, 0.0},
+	{"simple", []int64{1, 1}, 0.5, nil},
+	{"three", []int64{1, 1, 1}, 0.33, nil},
+	{"double", []int64{2, 1}, 0.66, nil},
+	{"triple", []int64{3, 1}, 0.75, nil},
+	{"big", []int64{200, 100}, 0.66, nil},
+	{"single", []int64{1, 0}, 1.0, nil},
+	{"revers", []int64{0, 1}, 0.0, nil},
+	{"downB", []int64{1, 1}, 1.0, []string{"", "D"}},
+	{"downA", []int64{1, 1}, 0.001, []string{"D", ""}},
+	{"remB", []int64{1, 1}, 1.0, []string{"", "R"}},
+	{"remA", []int64{1, 1}, 0.0, []string{"R", ""}},
 }
 
 func TestUpstreamPool(t *testing.T) {
-	serverA, upstreamA := upstreamPoolTestServer("A")
-	serverB, upstreamB := upstreamPoolTestServer("B")
-	defer serverA.StopAccepting()
-	defer serverB.StopAccepting()
-
 	iterations := 1000
 	for _, test := range upstreamPoolTestData {
+		// Setup test environment
+		resChar := 'A'
+		servers := make([]*falcore.Server, len(test.weights))
+		upstreams := make([]*Upstream, len(test.weights))
 		pool := NewUpstreamPool("TESTPOOL")
-		pool.AddUpstream(upstreamA, test.weights[0])
-		pool.AddUpstream(upstreamB, test.weights[1])
+		for i, w := range test.weights {
+			servers[i], upstreams[i] = upstreamPoolTestServer(string(resChar))
+			upstreams[i].PingPath = "/"
+			pool.AddUpstream(upstreams[i], w)
+			resChar++
+			if test.action != nil {
+				switch test.action[i] {
+				case "D":
+					servers[i].StopAccepting()
+				case "R":
+					pool.RemoveUpstream(upstreams[i])
+				}
+			}
+		}
+
 		aCount := 0
 		for i := 0; i < iterations; i++ {
 			req, _ := http.NewRequest("GET", "http://localhost/test", nil)
@@ -42,13 +61,23 @@ func TestUpstreamPool(t *testing.T) {
 			}
 		}
 		percent := float64(aCount) / float64(iterations)
-		if percent < test.ratio * 0.9 || percent > test.ratio * 1.1 {
+		if percent < test.ratio*0.9 || percent > test.ratio*1.1 {
 			t.Errorf("[%v] Result distribution %0.4f is out of range of goal %0.4f", test.name, percent, test.ratio)
+		}
+
+		// shutdown test servers (they might already have been shutdown)
+		for _, s := range servers {
+			go func() {
+				defer func() {
+					recover()
+				}()
+				s.StopAccepting()
+			}()
 		}
 	}
 }
 
-func upstreamPoolTestServer(res string)(*falcore.Server, *Upstream) {
+func upstreamPoolTestServer(res string) (*falcore.Server, *Upstream) {
 	// Start a test server
 	pipe := falcore.NewPipeline()
 	pipe.Upstream.PushBack(falcore.NewRequestFilter(func(req *falcore.Request) *http.Response {
@@ -59,5 +88,5 @@ func upstreamPoolTestServer(res string)(*falcore.Server, *Upstream) {
 		srv.ListenAndServe()
 	}()
 	<-srv.AcceptReady
-	return srv, NewUpstream(NewUpstreamTransport("localhost", srv.Port(), 0, nil))
+	return srv, NewUpstream(NewUpstreamTransport("localhost", srv.Port(), 100*time.Millisecond, nil))
 }

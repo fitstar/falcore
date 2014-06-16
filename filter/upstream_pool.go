@@ -179,13 +179,15 @@ func (up *UpstreamPool) nextServer() {
 		// Choose an entry that matches that value
 		up.mutex.RLock()
 		var next *upstreamEntry = nil
-		var goal = rand.Int63n(up.weightSum)
-		for _, e := range up.pool {
-			if !e.Down && e.Weight > goal {
-				next = e
-				break
+		if up.weightSum > 0 {
+			var goal = rand.Int63n(up.weightSum)
+			for _, e := range up.pool {
+				if !e.Down && e.Weight > goal {
+					next = e
+					break
+				}
+				goal -= e.Weight
 			}
-			goal -= e.Weight
 		}
 		up.mutex.RUnlock()
 
