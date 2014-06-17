@@ -25,7 +25,7 @@ type UpstreamPool struct {
 	kick         chan int            // let the nextServer selector know the config has changed
 	shutdown     chan int            // shut it down
 	mutex        *sync.RWMutex       // lock around config changes
-	pinger       *time.Ticker        // timer for pinging upstreams
+	pingResetChan chan int // send anything on this chan to restart the pinger
 }
 
 // The config consists of a map of the servers in the pool in the format host_or_ip:port
@@ -38,8 +38,8 @@ func NewUpstreamPool(name string) *UpstreamPool {
 	up.kick = make(chan int)
 	up.mutex = new(sync.RWMutex)
 	up.shutdown = make(chan int)
-	up.pinger = time.NewTicker(3 * time.Second) // 3s
 	up.pool = make([]*upstreamEntry, 0, 10)
+	up.pingResetChan = make(chan int, 1)
 	up.weightSum = 0
 
 	go up.nextServer()
@@ -103,6 +103,9 @@ func (up *UpstreamPool) AddUpstream(u *Upstream, weight int64) {
 	up.pool = newPool
 	up.rebalance()
 	up.mutex.Unlock()
+
+	// If the pinger has shutdown, reset it
+	up.resetPinger()
 }
 
 // Drop an upstream
@@ -204,28 +207,57 @@ func (up *UpstreamPool) nextServer() {
 	}
 }
 
+func (up *UpstreamPool) resetPinger() {
+	select {
+	case up.pingResetChan <- 1:
+	default:
+	}
+}
+
 func (up *UpstreamPool) pingUpstreams() {
-	pingable := true
-	for pingable {
+	// Create timer
+	pinger := time.NewTicker(3 * time.Second) // 3s
+	defer pinger.Stop()
+
+	for {
+		pingable := true
+		for pingable {
+			select {
+			case <-up.pingResetChan:
+				// As long as the pinger is running, we can discard 
+				// reset messages.  This will prevent it stopping
+				// and immediatly restarting, then stopping again.
+			case <-up.shutdown:
+				return
+			case <-pinger.C:
+				gotone := false
+				up.mutex.RLock()
+				for i, ups := range up.pool {
+					if ups.Upstream.PingPath != "" {
+						go up.pingUpstream(ups, i)
+						gotone = true
+					}
+				}
+				up.mutex.RUnlock()
+				if !gotone {
+					pingable = false
+				}
+			}
+		}
+		falcore.Warn("Stopping ping for %v", up.Name)
+		
+		// Wait for either Shutdown or a reset message
 		select {
 		case <-up.shutdown:
 			return
-		case <-up.pinger.C:
-			gotone := false
-			up.mutex.RLock()
-			for i, ups := range up.pool {
-				if ups.Upstream.PingPath != "" {
-					go up.pingUpstream(ups, i)
-					gotone = true
-				}
-			}
-			up.mutex.RUnlock()
-			if !gotone {
-				pingable = false
-			}
+		case <-up.pingResetChan:
+			// If we get a reset message, loop back around
+			// and start pinging again.  Currently, this will
+			// only happen if upstreams are added and the
+			// pinger has already stopped
 		}
+		falcore.Warn("Restarting ping for %v", up.Name)
 	}
-	falcore.Warn("Stopping ping for %v", up.Name)
 }
 
 func (up *UpstreamPool) pingUpstream(ups *upstreamEntry, index int) {
