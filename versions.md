@@ -11,7 +11,11 @@ We try to keep the master branch stable, however new APIs tend to change a lot u
 
 ## Version History
 
-### 1.0
+### 1.0.1
+
+* Documentation improvements.  No code changes.
+
+### 1.0.0
 
 * First versioned release
 * Targets go1.1
