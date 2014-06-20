@@ -2,7 +2,6 @@ package falcore
 
 import (
 	"github.com/fitstar/falcore/log"
-	"time"
 )
 
 // The "static" package logger
@@ -14,12 +13,6 @@ var logger log.Logger = log.NewStdLibLogger()
 // The default is a StdLibLogger
 func SetLogger(newLogger log.Logger) {
 	logger = newLogger
-}
-
-// Helper for calculating times.  return value in Seconds
-// DEPRECATED: Use endTime.Sub(startTime).Seconds()
-func TimeDiff(startTime time.Time, endTime time.Time) float32 {
-	return float32(endTime.Sub(startTime).Seconds())
 }
 
 // Log using the packages default logger.  You can change the

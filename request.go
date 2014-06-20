@@ -145,16 +145,17 @@ func (fReq *Request) Signature() string {
 // so it should only be used for debugging or development.  The source is a
 // good example of how to get useful information out of the Request.
 func (fReq *Request) Trace(res *http.Response) {
-	reqTime := TimeDiff(fReq.StartTime, fReq.EndTime)
+	reqTime := fReq.EndTime.Sub(fReq.StartTime).Seconds()
 	req := fReq.HttpRequest
 	Trace("%s [%s] %s%s S=%v Sig=%s Tot=%.4fs", fReq.ID, req.Method, req.Host, req.URL, res.StatusCode, fReq.Signature(), reqTime)
 	l := fReq.PipelineStageStats
 	for e := l.Front(); e != nil; e = e.Next() {
 		pss, _ := e.Value.(*PipelineStageStat)
-		dur := TimeDiff(pss.StartTime, pss.EndTime)
+		dur := pss.EndTime.Sub(pss.StartTime).Seconds()
 		Trace("%s [%s]%-30s S=%d Tot=%.4fs %%=%.2f", fReq.ID, pss.Type, pss.Name, pss.Status, dur, dur/(reqTime*100.0))
 	}
-	Trace("%s %-30s S=0 Tot=%.4fs %%=%.2f", fReq.ID, "Overhead", float32(fReq.Overhead)/float32(time.Second), float32(fReq.Overhead)/float32(time.Second)/reqTime*100.0)
+	overhead := fReq.Overhead.Seconds()
+	Trace("%s %-30s S=0 Tot=%.4fs %%=%.2f", fReq.ID, "Overhead", overhead, overhead/reqTime*100.0)
 }
 
 func (fReq *Request) finishRequest() {
