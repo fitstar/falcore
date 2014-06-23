@@ -32,6 +32,7 @@ func SetLogger(newLogger Logger) {
 }
 
 // Helper for calculating times.  return value in Seconds
+// DEPRECATED: Use endTime.Sub(startTime).Seconds()
 func TimeDiff(startTime time.Time, endTime time.Time) float32 {
 	return float32(endTime.Sub(startTime)) / float32(time.Second)
 }
