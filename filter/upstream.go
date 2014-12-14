@@ -75,7 +75,7 @@ func (u *Upstream) FilterRequest(request *falcore.Request) (res *http.Response) 
 	req.Header.Set("Connection", "Keep-Alive")
 	var upstrRes *http.Response
 	upstrRes, err = u.Transport.transport.RoundTrip(req)
-	diff := falcore.TimeDiff(before, time.Now())
+	diff := time.Now().Sub(before).Seconds()
 	if err == nil {
 		// Copy response over to new record.  Remove connection noise.  Add some sanity.
 		res = falcore.StringResponse(req, upstrRes.StatusCode, nil, "")
