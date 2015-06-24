@@ -27,6 +27,7 @@ func (f *EtagFilter) FilterResponse(request *falcore.Request, res *http.Response
 			res.Body.Close()
 			res.Body = nil
 			res.ContentLength = 0
+			res.TransferEncoding = nil
 			request.CurrentStage.Status = 0 // Success
 		}
 	}
