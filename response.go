@@ -17,15 +17,19 @@ func SimpleResponse(req *http.Request, status int, headers http.Header, contentL
 	res.ProtoMinor = 1
 	res.ContentLength = contentLength
 	res.Request = req
-	res.Header = make(map[string][]string)
+
+	if headers != nil {
+		res.Header = headers
+	} else {
+		res.Header = make(http.Header)
+	}
+
 	if body_rdr, ok := body.(io.ReadCloser); ok {
 		res.Body = body_rdr
 	} else if body != nil {
 		res.Body = ioutil.NopCloser(body)
 	}
-	if headers != nil {
-		res.Header = headers
-	}
+
 	return res
 }
 
