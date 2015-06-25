@@ -11,6 +11,13 @@ We try to keep the master branch stable, however new APIs tend to change a lot u
 
 ## Version History
 
+### 1.0.2
+
+* fixed minor bug in etag filter regarding chunked responses
+* deprecated SplitHostPort.  use the version in net instead.  will be removed in v2.x.x
+* deprecated TimeDiff.  use the tools in time package instead.  will be removed in v2.x.x
+* improved hot restart example
+
 ### 1.0.1
 
 * Documentation improvements.  No code changes.
