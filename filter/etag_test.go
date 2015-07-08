@@ -145,7 +145,6 @@ func eget(name, p, etag string, t *testing.T) (r *http.Response, body []byte, er
 		body = bodyBuf.Bytes()
 
 		// Check for remaining crap
-		t.Errorf("RESPONSE: %v", string(debugBuf.Bytes()))
 		if l := buf.Buffered(); l > 0 {
 			d, _ := buf.Peek(l)
 			t.Errorf("%v Unexpected extra data (%v bytes) in buffer: %v", name, l, string(d))
