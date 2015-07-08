@@ -53,18 +53,15 @@ func main() {
 
 	// parse upstream list and create the upstream pool
 	upStrings := regexp.MustCompile("[0-9]+").FindAllString(*flagUpstream, -1)
-	ups := make([]*filter.UpstreamEntry, len(upStrings))
-	for i, s := range upStrings {
+	pool := filter.NewUpstreamPool("railsdemo")
+	for _, s := range upStrings {
 		port, _ := strconv.Atoi(s)
-		ups[i] = &filter.UpstreamEntry{
-			Upstream: filter.NewUpstream(filter.NewUpstreamTransport("localhost", port, 0, nil)),
-			Weight:   1,
-		}
+		pool.AddUpstream(filter.NewUpstream(filter.NewUpstreamTransport("localhost", port, 0, nil)), 1)
 	}
 
 	// create upstream pool and add to pipeline
-	if len(ups) > 0 {
-		pipeline.Upstream.PushBack(filter.NewUpstreamPool("railsdemo", ups))
+	if len(upStrings) > 0 {
+		pipeline.Upstream.PushBack(pool)
 	} else {
 		falcore.Warn("No upstream ports provided")
 	}
