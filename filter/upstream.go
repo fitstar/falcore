@@ -104,7 +104,6 @@ func (u *Upstream) FilterRequest(request *falcore.Request) (res *http.Response) 
 				// There was an error reading the body
 				upstrRes.Body.Close()
 				res.ContentLength = 0
-				res.Body = nil
 			}
 		}
 		// Copy over headers with a few exceptions
