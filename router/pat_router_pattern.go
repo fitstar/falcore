@@ -1,5 +1,15 @@
 package router
 
+import (
+	"errors"
+)
+
+var (
+	errNestedOptional        = errors.New("nested optionals are not supported")
+	errUnexpectedEndOptional = errors.New("unexpected end optional")
+	errUnmatchedOptionals    = errors.New("unmatched optionals")
+)
+
 type Pattern struct {
 	raw    string
 	tokens []token
@@ -7,10 +17,40 @@ type Pattern struct {
 
 func ParsePattern(pat string) (*Pattern, error) {
 	if t, e := tokenizePattern(pat); e == nil {
-		return &Pattern{pat, t}, nil
+		p := &Pattern{pat, t}
+		if e = p.validate(); e == nil {
+			return p, nil
+		} else {
+			return nil, e
+		}
 	} else {
 		return nil, e
 	}
+}
+
+func (p *Pattern) validate() error {
+	var optionCount int = 0
+
+	for _, token := range p.tokens {
+		switch token.tokenType {
+		case tokenBeginOptional:
+			optionCount++
+		case tokenEndOptional:
+			optionCount--
+		}
+
+		if optionCount > 1 {
+			return errNestedOptional
+		}
+		if optionCount < 0 {
+			return errUnexpectedEndOptional
+		}
+	}
+	if optionCount != 0 {
+		return errUnmatchedOptionals
+	}
+
+	return nil
 }
 
 func (p *Pattern) match(path string) (bool, map[string]string) {
