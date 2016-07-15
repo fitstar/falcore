@@ -16,6 +16,10 @@ func (t token) empty() bool {
 
 func (t token) match(input string) (bool, int) {
 	switch t.tokenType {
+	case tokenBeginOptional:
+		return true, 0
+	case tokenEndOptional:
+		return true, 0
 	case tokenCapture:
 		for i := 0; i < len(input); i++ {
 			if input[i:i+1] == "/" {

@@ -61,6 +61,27 @@ var matcherTestData = []struct {
 		true,
 		map[string]string{"foo": "bar"},
 	},
+	{
+		"user id",
+		"/users/:user_id",
+		"/users/abc123",
+		true,
+		map[string]string{"user_id": "abc123"},
+	},
+	{
+		"optional match",
+		"(/users/:user_id)/foo",
+		"/users/abc123/foo",
+		true,
+		map[string]string{"user_id": "abc123"},
+	},
+	{
+		"optional mismatch",
+		"(/users/:user_id)/foo",
+		"/foo",
+		true,
+		map[string]string{},
+	},
 }
 
 func Test_pattern_match(t *testing.T) {
