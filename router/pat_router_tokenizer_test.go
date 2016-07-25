@@ -65,6 +65,41 @@ var tokenizeTestData = []struct {
 		},
 		nil,
 	},
+	{
+		"simple dot",
+		"/foo.txt",
+		[]token{
+			token{tokenSlash, "/"},
+			token{tokenLiteral, "foo"},
+			token{tokenDot, "."},
+			token{tokenLiteral, "txt"},
+		},
+		nil,
+	},
+	{
+		"ignore middle dot",
+		"/foo.bar/baz",
+		[]token{
+			token{tokenSlash, "/"},
+			token{tokenLiteral, "foo.bar"},
+			token{tokenSlash, "/"},
+			token{tokenLiteral, "baz"},
+		},
+		nil,
+	},
+	{
+		"dot captures",
+		"/users/:user_id.:format",
+		[]token{
+			token{tokenSlash, "/"},
+			token{tokenLiteral, "users"},
+			token{tokenSlash, "/"},
+			token{tokenCapture, "user_id"},
+			token{tokenDot, "."},
+			token{tokenCapture, "format"},
+		},
+		nil,
+	},
 }
 
 func Test_tokenizePattern(t *testing.T) {

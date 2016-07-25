@@ -2,6 +2,7 @@ package router
 
 import (
 	"fmt"
+	"strings"
 )
 
 type tokenType int
@@ -77,6 +78,20 @@ func tokenizePattern(pat string) ([]token, error) {
 			}
 			tokens = append(tokens, token{tokenEndOptional, ")"})
 			currentToken = emptyToken
+		case ".":
+			// only tokenize . at the end of a url
+			if strings.Contains(pat[i+1:], "/") || strings.Contains(pat[i+1:], ".") {
+				if currentToken.empty() {
+					currentToken = token{tokenLiteral, ""}
+				}
+				currentToken.raw += char
+			} else {
+				if !currentToken.empty() {
+					tokens = append(tokens, currentToken)
+				}
+				tokens = append(tokens, token{tokenDot, "."})
+				currentToken = emptyToken
+			}
 		default:
 			if currentToken.empty() {
 				currentToken = token{tokenLiteral, ""}
