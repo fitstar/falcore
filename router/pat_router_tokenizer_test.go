@@ -100,6 +100,17 @@ var tokenizeTestData = []struct {
 		},
 		nil,
 	},
+	{
+		"wildcard",
+		"/foo/*",
+		[]token{
+			token{tokenSlash, "/"},
+			token{tokenLiteral, "foo"},
+			token{tokenSlash, "/"},
+			token{tokenWildcard, "*"},
+		},
+		nil,
+	},
 }
 
 func Test_tokenizePattern(t *testing.T) {

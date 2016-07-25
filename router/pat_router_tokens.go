@@ -43,6 +43,7 @@ const (
 	tokenDot
 	tokenLiteral
 	tokenCapture
+	tokenWildcard
 	tokenBeginOptional
 	tokenEndOptional
 )
@@ -92,6 +93,12 @@ func tokenizePattern(pat string) ([]token, error) {
 				tokens = append(tokens, token{tokenDot, "."})
 				currentToken = emptyToken
 			}
+		case "*":
+			if !currentToken.empty() {
+				tokens = append(tokens, currentToken)
+			}
+			tokens = append(tokens, token{tokenWildcard, "*"})
+			currentToken = emptyToken
 		default:
 			if currentToken.empty() {
 				currentToken = token{tokenLiteral, ""}
