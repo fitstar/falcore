@@ -64,6 +64,10 @@ func (up UpstreamPool) LogStatus() {
 }
 
 func (up UpstreamPool) FilterRequest(req *falcore.Request) (res *http.Response) {
+	if len(up.pool) < 1 {
+		return falcore.StringResponse(req.HttpRequest, 503, nil, "Service Unavailable\n")
+	}
+
 	ue := up.Next()
 	res = ue.Upstream.FilterRequest(req)
 	if req.CurrentStage.Status == 2 {
@@ -91,6 +95,11 @@ func (up UpstreamPool) Shutdown() {
 }
 
 func (up UpstreamPool) nextServer() {
+	// Don't start up if there are no entries
+	if len(up.pool) < 1 {
+		return
+	}
+
 	loopCount := 0
 	for {
 		next := up.rr_count % len(up.pool)
