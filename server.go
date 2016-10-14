@@ -218,6 +218,11 @@ func (srv *Server) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 		theHeader[key] = header
 	}
 
+	// Handle Content-Length
+	if res.ContentLength >= 0 {
+		theHeader.Set("Content-Length", strconv.FormatInt(res.ContentLength, 10))
+	}
+
 	// Write headers
 	wr.WriteHeader(res.StatusCode)
 

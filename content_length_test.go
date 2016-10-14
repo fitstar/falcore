@@ -4,8 +4,16 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"strconv"
 	"testing"
+)
+
+var (
+	// Go HTTP server uses a buffer to auto-un-chunk small responses.
+	// Use large enough response body to overflow that so tests behave as expected
+	testContent1MB = make([]byte, 1024*1024)
 )
 
 var contentLengthTestData = []struct {
@@ -17,13 +25,13 @@ var contentLengthTestData = []struct {
 	chunked               bool
 }{
 	{"GET", "/basic", []byte("ABC"), 3, 3, false},
-	{"GET", "/chunked", []byte("ABC"), -1, -1, true},
+	{"GET", "/chunked", testContent1MB, -1, -1, true},
 	{"GET", "/zero", []byte(""), 0, 0, false},
-	{"GET", "/unset", []byte("ABC"), 0, -1, true},
+	{"GET", "/unset", testContent1MB, 0, -1, true},
 	{"GET", "/nil_body", nil, 0, 0, false},
 	{"HEAD", "/basic", []byte("ABC"), 3, 3, false},
-	{"HEAD", "/chunked", []byte("ABC"), -1, -1, false},
-	{"HEAD", "/unset", []byte("ABC"), 0, -1, false},
+	{"HEAD", "/chunked", testContent1MB, -1, -1, false},
+	{"HEAD", "/unset", testContent1MB, 0, -1, false},
 	{"HEAD", "/zero", []byte(""), 0, 0, false},
 	{"HEAD", "/nil_body", nil, 0, 0, false},
 	{"HEAD", "/unset_nil", nil, -1, -1, false},
@@ -32,6 +40,50 @@ var contentLengthTestData = []struct {
 
 func TestContentLength(t *testing.T) {
 	// Startup a basic server and get the port
+	srv := serverForContentLengthTest()
+	go func() {
+		srv.ListenAndServe()
+	}()
+	<-srv.AcceptReady
+	serverPort := srv.Port()
+
+	// Run Tests
+	testContentLengthWithPort(t, serverPort)
+
+	// Clean up
+	srv.StopAccepting()
+}
+
+func TestContentLength_GoHttpServer(t *testing.T) {
+	// Startup a basic server and get the port
+	srv := &http.Server{
+		Addr:    ":0",
+		Handler: serverForContentLengthTest(),
+	}
+	portChan := make(chan int)
+	// Create listner
+	l, _ := net.Listen("tcp", ":0")
+	go func() {
+		// Get port
+		a := l.Addr()
+		if _, p, e := net.SplitHostPort(a.String()); e == nil && p != "" {
+			portInt, _ := strconv.Atoi(p)
+			portChan <- portInt
+		}
+
+		// Serve via net/http Server
+		srv.Serve(l)
+	}()
+	serverPort := <-portChan
+
+	// Run Tests
+	testContentLengthWithPort(t, serverPort)
+
+	// Clean up
+	l.Close()
+}
+
+func serverForContentLengthTest() *Server {
 	pipeline := NewPipeline()
 	srv := NewServer(0, pipeline)
 	pipeline.Upstream.PushBack(NewRequestFilter(func(req *Request) *http.Response {
@@ -46,12 +98,10 @@ func TestContentLength(t *testing.T) {
 		}
 		panic("Thing not found")
 	}))
-	go func() {
-		srv.ListenAndServe()
-	}()
-	<-srv.AcceptReady
-	serverPort := srv.Port()
+	return srv
+}
 
+func testContentLengthWithPort(t *testing.T, serverPort int) {
 	// Connect and make some requests
 	c := new(http.Client)
 	for _, test := range contentLengthTestData {
@@ -91,7 +141,4 @@ func TestContentLength(t *testing.T) {
 
 		res.Body.Close()
 	}
-
-	// Clean up
-	srv.StopAccepting()
 }
