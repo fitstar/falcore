@@ -162,7 +162,7 @@ func TestHandlerWriteResponse(t *testing.T) {
 			}
 			// The body shouldn't have been written to the response
 			if connectionResponse.String() != "" {
-				t.Errorf("%v Body written to response when it wasn't supposed to: ", test.Name, connectionResponse.String())
+				t.Errorf("%v Body written to response when it wasn't supposed to: %v", test.Name, connectionResponse.String())
 			}
 		}
 	}
