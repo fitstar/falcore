@@ -26,6 +26,7 @@ type Server struct {
 	Addr                string
 	Pipeline            *Pipeline
 	CompletionCallback  RequestCompletionCallback
+	ListenerTimeout     time.Duration // used to set deadline on listener (Default: 3s)
 	listener            net.Listener
 	listenerFile        *os.File
 	stopAccepting       chan struct{}
@@ -48,6 +49,7 @@ func NewServer(port int, pipeline *Pipeline) *Server {
 	s := new(Server)
 	s.Addr = fmt.Sprintf(":%v", port)
 	s.Pipeline = pipeline
+	s.ListenerTimeout = time.Second * 3
 	s.stopAccepting = make(chan struct{})
 	s.closableAcceptReady = make(chan struct{})
 	s.AcceptReady = s.closableAcceptReady
@@ -170,7 +172,7 @@ func (srv *Server) serve() error {
 		var c net.Conn
 		var err error
 		if l, ok := srv.listener.(*net.TCPListener); ok {
-			l.SetDeadline(time.Now().Add(3 * time.Second))
+			l.SetDeadline(time.Now().Add(srv.ListenerTimeout))
 		}
 		c, err = srv.listener.Accept()
 		if err != nil {
